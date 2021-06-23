@@ -26,9 +26,10 @@ def merkle_crh(layer, left, right):
     l = i2lebsp(10, MERKLE_DEPTH - 1 - layer)
     return sinsemilla_hash(b"z.cash:Orchard-MerkleCRH", l + left + right)
 
-EMPTY_ROOTS = [Fp(2)]
-for altitude in range(1, 32):
-    EMPTY_ROOTS.append(merkle_crh(MERKLE_DEPTH - 1 - altitude, EMPTY_ROOTS[altitude - 1].bits(L_MERKLE), EMPTY_ROOTS[altitude - 1].bits(L_MERKLE)))
+EMPTY_ROOTS = [UNCOMMITTED]
+for altitude in range(0, MERKLE_DEPTH):
+    layer = MERKLE_DEPTH - 1 - altitude
+    EMPTY_ROOTS.append(merkle_crh(layer, EMPTY_ROOTS[altitude].bits(L_MERKLE), EMPTY_ROOTS[altitude].bits(L_MERKLE)))
 
 def anchor(leaves):
     leaves0 = leaves.copy()
@@ -40,21 +41,20 @@ def anchor(leaves):
     for _ in range(0, padding_len):
         leaves0.append(UNCOMMITTED)
 
-    print("Creating anchor for perfect tree of " + str(len(leaves0)) + " leaves")
     hashes = [leaves0]
-    for altitude in range(1, perfect_height + 1):
-        print(altitude)
+    for altitude in range(0, perfect_height):
+        layer = MERKLE_DEPTH - 1 - altitude
         hashes.append([])
-        for pos in range(0, perfect_leaves >> altitude):
-            left = hashes[altitude - 1][pos * 2]
-            right = hashes[altitude - 1][pos * 2 + 1]
-            hashes[altitude].append(merkle_crh(MERKLE_DEPTH - 1 - altitude, left.bits(L_MERKLE), right.bits(L_MERKLE)))
+        for pos in range(0, perfect_leaves >> (altitude + 1)):
+            left = hashes[altitude][pos * 2]
+            right = hashes[altitude][pos * 2 + 1]
+            hashes[altitude + 1].append(merkle_crh(layer, left.bits(L_MERKLE), right.bits(L_MERKLE)))
 
     assert len(hashes[perfect_height]) == 1
     root = hashes[perfect_height][0]
-    for altitude in range(perfect_height + 1, MERKLE_DEPTH):
-        print(altitude)
-        root = merkle_crh(MERKLE_DEPTH - 1 - altitude, root.bits(L_MERKLE), EMPTY_ROOTS[altitude].bits(L_MERKLE))
+    for altitude in range(perfect_height, MERKLE_DEPTH):
+        layer = MERKLE_DEPTH - 1 - altitude
+        root = merkle_crh(layer, root.bits(L_MERKLE), EMPTY_ROOTS[altitude].bits(L_MERKLE))
 
     return root
 
